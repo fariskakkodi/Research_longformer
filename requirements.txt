@@ -1,0 +1,9 @@
+cat > requirements.txt << 'EOF'
+torch>=2.1
+transformers>=4.44
+accelerate>=0.34
+pandas>=2.2
+scikit-learn>=1.4
+datasets>=2.20
+numpy>=1.26
+EOF
