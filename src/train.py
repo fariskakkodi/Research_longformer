@@ -8,7 +8,7 @@ from src.data_utils import AnswersDataset
 from src.model_utils import build_model
 
 def main():
-    csv_path = "data/CLASSIFIES_datatable.csv"
+    csv_path = "data/PSU_q2_dataset.csv"
     model_name = "allenai/longformer-base-4096"
     max_len = 2048
     train_bs = 2
