@@ -19,8 +19,12 @@ def main():
 
     df = pd.read_csv(csv_path).dropna(subset=["student_answer", "label"]).copy()
     df["label"] = df["label"].astype(int)
-    train_df, val_df = train_test_split(df, test_size=0.2, stratify=df["label"], random_state=42)
-
+    train_df, temp_df = train_test_split(
+        df, test_size=0.30, stratify=df["label"], random_state=42
+    )
+    val_df, test_df = train_test_split(
+        temp_df, test_size=0.50, stratify=temp_df["label"], random_state=42
+    )
     tok = LongformerTokenizerFast.from_pretrained(model_name)
     train_ds = AnswersDataset(train_df, tok, max_len=max_len)
     val_ds   = AnswersDataset(val_df, tok, max_len=max_len)
