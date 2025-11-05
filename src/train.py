@@ -10,10 +10,10 @@ from src.model_utils import build_model
 def main():
     csv_path = "data/PSU_q2_dataset.csv"
     model_name = "allenai/longformer-base-4096"
-    max_len = 2048
+    max_len = 512
     train_bs = 2
     val_bs = 2
-    epochs = 3
+    epochs = 5
     lr = 2e-5
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
