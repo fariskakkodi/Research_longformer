@@ -15,7 +15,7 @@ def main():
     max_len = 512
     train_bs = 2
     val_bs = 2
-    epochs = 5
+    epochs = 10
     lr = 2e-5
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
