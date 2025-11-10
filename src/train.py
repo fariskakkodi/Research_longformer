@@ -1,3 +1,4 @@
+import os
 import torch
 import pandas as pd
 import numpy as np
@@ -18,25 +19,23 @@ def main():
     lr = 2e-5
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+    best_val_acc = -1.0
+    best_ckpt_path = "best_model.pt"
+
     df = pd.read_csv(csv_path).dropna(subset=["student_answer", "label"]).copy()
     df["label"] = df["label"].astype(int)
 
-    # Train/Val/Test: 70/15/15
-    train_df, temp_df = train_test_split(
-        df, test_size=0.30, stratify=df["label"], random_state=42
-    )
-    val_df, test_df = train_test_split(
-        temp_df, test_size=0.50, stratify=temp_df["label"], random_state=42
-    )
+    train_df, temp_df = train_test_split(df, test_size=0.30, stratify=df["label"], random_state=42)
+    val_df, test_df = train_test_split(temp_df, test_size=0.50, stratify=temp_df["label"], random_state=42)
 
     tok = LongformerTokenizerFast.from_pretrained(model_name)
     train_ds = AnswersDataset(train_df, tok, max_len=max_len)
-    val_ds   = AnswersDataset(val_df, tok, max_len=max_len)
-    test_ds  = AnswersDataset(test_df, tok, max_len=max_len)
+    val_ds = AnswersDataset(val_df, tok, max_len=max_len)
+    test_ds = AnswersDataset(test_df, tok, max_len=max_len)
 
     train_loader = DataLoader(train_ds, batch_size=train_bs, shuffle=True)
-    val_loader   = DataLoader(val_ds,   batch_size=val_bs,   shuffle=False)
-    test_loader  = DataLoader(test_ds,  batch_size=val_bs,   shuffle=False)
+    val_loader = DataLoader(val_ds, batch_size=val_bs, shuffle=False)
+    test_loader = DataLoader(test_ds, batch_size=val_bs, shuffle=False)
 
     model = build_model(model_name, num_labels=3).to(device)
     optim = torch.optim.AdamW(model.parameters(), lr=lr)
@@ -71,10 +70,17 @@ def main():
                 preds = out["logits"].argmax(dim=-1)
                 correct += (preds == batch["labels"]).sum().item()
                 total += batch["labels"].size(0)
-        acc = correct / total if total else 0.0
-        print(f"epoch {epoch}  val_acc={acc:.4f}")
 
+        val_acc = correct / total if total else 0.0
+        print(f"epoch {epoch}  val_acc={val_acc:.4f}")
+
+        if val_acc > best_val_acc:
+            best_val_acc = val_acc
+            torch.save(model.state_dict(), best_ckpt_path)
+
+    model.load_state_dict(torch.load(best_ckpt_path, map_location=device))
     model.eval()
+
     total = correct = 0
     all_preds, all_labels = [], []
     with torch.inference_mode():
@@ -97,11 +103,10 @@ def main():
     all_preds = torch.cat(all_preds).numpy()
     all_labels = torch.cat(all_labels).numpy()
     if all_preds.std() == 0 or all_labels.std() == 0:
-        print("Correlation between predictions and labels: undefined (zero variance)")
+        print("Correlation between predictions and labels: undefined")
     else:
         corr = np.corrcoef(all_preds, all_labels)[0, 1]
         print(f"Correlation between predictions and labels: {corr:.4f}")
 
 if __name__ == "__main__":
     main()
-
