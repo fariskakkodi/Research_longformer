@@ -16,11 +16,15 @@ class AnswersDataset(Dataset):
         return len(self.texts)
 
     def __getitem__(self, idx):
-        text = self.texts[idx]
+        student_text = self.texts[idx]
         model_text = self.texts[idx]
         label = self.labels[idx]
+        combined = (
+            "Model answer: " + model_text + "\n"
+            "Student answer: " + student_text
+        )
         enc = self.tokenizer(
-            text,
+            combined,
             padding="max_length",
             truncation=True,
             max_length=self.max_len,
