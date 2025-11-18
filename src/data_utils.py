@@ -5,8 +5,9 @@ from torch.utils.data import DataLoader, Dataset
 import torch
 
 class AnswersDataset(Dataset):
-    def __init__(self, df, tokenizer, text_col="student_answer", label_col="label", max_len=2048):
+    def __init__(self, df, tokenizer, text_col="student_answer", model_col="model_answer", label_col="label", max_len=2048):
         self.texts = df[text_col].astype(str).fillna("").tolist()
+        self.modelanswer = df[model_col].astype(str).fillna("").tolist()
         self.labels = df[label_col].astype(int).tolist()
         self.tokenizer = tokenizer
         self.max_len = max_len
@@ -16,6 +17,7 @@ class AnswersDataset(Dataset):
 
     def __getitem__(self, idx):
         text = self.texts[idx]
+        model_text = self.texts[idx]
         label = self.labels[idx]
         enc = self.tokenizer(
             text,
