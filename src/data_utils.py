@@ -20,8 +20,8 @@ class AnswersDataset(Dataset):
         model_text = self.texts[idx]
         label = self.labels[idx]
         combined = (
-            "Model answer: " + model_text + "\n"
-            "Student answer: " + student_text
+            "Student answer: " + student_text + "\n"
+            "Model answer: " + model_text
         )
         enc = self.tokenizer(
             combined,
