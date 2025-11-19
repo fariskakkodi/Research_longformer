@@ -42,7 +42,7 @@ if __name__ == "__main__":
     df = pd.read_csv("data/CLASSIFIES_datatable.csv")
     tokenizer = LongformerTokenizerFast.from_pretrained("allenai/longformer-base-4096")
 
-    train_df, temp_df = train_test_split(df, test_size=0.3, stratify=df["label"], random_state=42)
+    train_df, temp_df = train_test_split(df, test_size=0.2, stratify=df["label"], random_state=42)
     val_df, test_df = train_test_split(temp_df, test_size=0.5, stratify=temp_df["label"], random_state=42)
 
     train_dataset = AnswersDataset(train_df, tokenizer)
