@@ -18,8 +18,8 @@ class AnswersDataset(Dataset):
 
     def __getitem__(self, idx):
         student_text = self.texts[idx]
-        model_text = self.texts[idx]
-        question_text = self.texts[idx]
+        model_text = self.modelanswer[idx]
+        question_text = self.question[idx]
         label = self.labels[idx]
         combined = (
             "Question: " + question_text + "\n"
