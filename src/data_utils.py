@@ -5,9 +5,10 @@ from torch.utils.data import DataLoader, Dataset
 import torch
 
 class AnswersDataset(Dataset):
-    def __init__(self, df, tokenizer, text_col="student_answer", model_col="model_answer", label_col="label", max_len=2048):
+    def __init__(self, df, tokenizer, text_col="student_answer", model_col="model_answer", question_col="question", label_col="label", max_len=2048):
         self.texts = df[text_col].astype(str).fillna("").tolist()
         self.modelanswer = df[model_col].astype(str).fillna("").tolist()
+        self.question = df[question_col].astype(str).fillna("").tolist()
         self.labels = df[label_col].astype(int).tolist()
         self.tokenizer = tokenizer
         self.max_len = max_len
@@ -18,8 +19,10 @@ class AnswersDataset(Dataset):
     def __getitem__(self, idx):
         student_text = self.texts[idx]
         model_text = self.texts[idx]
+        question_text = self.texts[idx]
         label = self.labels[idx]
         combined = (
+            "Question: " + question_text + "\n"
             "Student answer: " + student_text + "\n"
             "Model answer: " + model_text
         )
