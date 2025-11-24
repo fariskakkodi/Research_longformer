@@ -35,15 +35,18 @@ def main():
         },
     )
 
-
     best_val_acc = -1.0
     best_ckpt_path = "best_model.pt"
 
     df = pd.read_csv(csv_path).dropna(subset=["student_answer", "label"]).copy()
     df["label"] = df["label"].astype(int)
 
-    train_df, temp_df = train_test_split(df, test_size=0.30, stratify=df["label"], random_state=42)
-    val_df, test_df = train_test_split(temp_df, test_size=0.50, stratify=temp_df["label"], random_state=42)
+    train_df, temp_df = train_test_split(
+        df, test_size=0.30, stratify=df["label"], random_state=42
+    )
+    val_df, test_df = train_test_split(
+        temp_df, test_size=0.50, stratify=temp_df["label"], random_state=42
+    )
 
     tok = LongformerTokenizerFast.from_pretrained(model_name)
     train_ds = AnswersDataset(train_df, tok, max_len=max_len)
@@ -59,11 +62,11 @@ def main():
 
     wandb.watch(model, log="all", log_freq=100)
 
-
     for epoch in range(1, epochs + 1):
         model.train()
         running_train_loss = 0.0
         num_train_batches = 0
+
         for batch in train_loader:
             batch = {k: v.to(device) for k, v in batch.items()}
             out = model(
@@ -77,6 +80,7 @@ def main():
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
             optim.step()
+
             wandb.log(
                 {
                     "train_batch_loss": loss.item(),
@@ -86,12 +90,14 @@ def main():
 
             running_train_loss += loss.item()
             num_train_batches += 1
+
         avg_train_loss = running_train_loss / max(num_train_batches, 1)
         wandb.log({"epoch": epoch, "train_loss": avg_train_loss})
 
+        # ===== VALIDATION LOOP (FIXED) =====
         model.eval()
         total = correct = 0
-        val_loss_total = 0.0  # wandb: track validation loss
+        val_loss_total = 0.0      # accumulate validation loss
         num_val_batches = 0
 
         with torch.inference_mode():
@@ -103,12 +109,19 @@ def main():
                     labels=batch["labels"],
                     global_attention_mask=batch.get("global_attention_mask", None),
                 )
+
+                # NEW: accumulate loss and batch count
+                val_loss_total += out["loss"].item()
+                num_val_batches += 1
+
                 preds = out["logits"].argmax(dim=-1)
                 correct += (preds == batch["labels"]).sum().item()
                 total += batch["labels"].size(0)
 
-        val_acc = correct / total if total else 0.0
-        val_acc = correct / total if total else 0.0
+        # NEW: compute average val_loss
+        val_loss = val_loss_total / max(num_val_batches, 1)
+        val_acc = correct / total if total else 0.0  # keep only one line
+
         wandb.log(
             {
                 "epoch": epoch,
@@ -152,13 +165,15 @@ def main():
     all_labels = torch.cat(all_labels).numpy()
     if all_preds.std() == 0 or all_labels.std() == 0:
         print("Correlation between predictions and labels: undefined")
+        corr = None
     else:
         corr = np.corrcoef(all_preds, all_labels)[0, 1]
         print(f"Correlation between predictions and labels: {corr:.4f}")
+
     wandb.log(
         {
             "test_acc": test_acc,
-            "test_corr": float(corr) if all_preds.std() != 0 and all_labels.std() != 0 else None,
+            "test_corr": float(corr) if corr is not None else None,
         }
     )
 
