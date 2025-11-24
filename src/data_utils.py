@@ -4,6 +4,7 @@ from transformers import LongformerTokenizerFast
 from torch.utils.data import DataLoader, Dataset
 import torch
 
+
 class AnswersDataset(Dataset):
     def __init__(self, df, tokenizer, text_col="student_answer", model_col="model_answer", question_col="question", label_col="label", max_len=2048):
         self.texts = df[text_col].astype(str).fillna("").tolist()
@@ -21,10 +22,11 @@ class AnswersDataset(Dataset):
         model_text = self.modelanswer[idx]
         question_text = self.question[idx]
         label = self.labels[idx]
+        sep = self.tokenizer.sep_token
         combined = (
-            "Question: " + question_text + "\n"
-            "Student answer: " + student_text + "\n"
-            "Model answer: " + model_text
+            f"Question: {question_text} {sep} "
+            f"Student answer: {student_text} {sep} "
+            f"Model answer: {model_text}"
         )
         enc = self.tokenizer(
             combined,
