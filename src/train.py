@@ -4,8 +4,7 @@ import pandas as pd
 import numpy as np
 from torch.utils.data import DataLoader
 from sklearn.model_selection import train_test_split
-from transformers import LongformerTokenizerFast
-
+from transformers import LongformerTokenizerFast, get_linear_schedule_with_warmup
 from src.data_utils import AnswersDataset
 from src.model_utils import build_model
 
@@ -19,6 +18,7 @@ def main():
     val_bs = 2
     epochs = 3
     lr = 2e-5
+    warmup_ratio = 0.1
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     wandb.init(
@@ -31,6 +31,7 @@ def main():
             "val_batch_size": val_bs,
             "epochs": epochs,
             "learning_rate": lr,
+            "warmup_ratio": warmup_ratio,
             "device": str(device),
         },
     )
@@ -59,6 +60,13 @@ def main():
 
     model = build_model(model_name, num_labels=3).to(device)
     optim = torch.optim.AdamW(model.parameters(), lr=lr)
+    num_training_steps = epochs * len(train_loader)
+    num_warmup_steps = int(warmup_ratio * num_training_steps)
+    scheduler = get_linear_schedule_with_warmup(
+        optim,
+        num_warmup_steps=num_warmup_steps,
+        num_training_steps=num_training_steps,
+    )
 
     wandb.watch(model, log="all", log_freq=100)
 
@@ -80,7 +88,7 @@ def main():
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
             optim.step()
-
+            scheduler.step()
             wandb.log(
                 {
                     "train_batch_loss": loss.item(),
