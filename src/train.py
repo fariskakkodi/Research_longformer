@@ -11,7 +11,7 @@ from src.model_utils import build_model
 import wandb
 
 def main():
-    csv_path = "classifies_edited.csv"
+    csv_path = "data/classifies_edited.csv"
     model_name = "allenai/longformer-base-4096"
     max_len = 512
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
