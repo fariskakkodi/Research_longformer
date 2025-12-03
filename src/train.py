@@ -14,28 +14,31 @@ def main():
     csv_path = "classifies_edited.csv"
     model_name = "allenai/longformer-base-4096"
     max_len = 512
-    train_bs = 2
-    val_bs = 2
-    epochs = 3
-    lr = 2e-5
-    warmup_ratio = 0.1
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    config_defaults = {
+        "csv_path": csv_path,
+        "model_name": model_name,
+        "max_len": max_len,
+        "train_batch_size": 2,
+        "val_batch_size": 2,
+        "epochs": 3,
+        "learning_rate": 2e-5,
+        "warmup_ratio": 0.1,
+        "weight_decay": 0.01,   # NEW: we'll sweep this too if we want
+        "device": str(device),
+    }
 
     wandb.init(
-        project="research_longformer",  # you can rename this project
-        config={
-            "csv_path": csv_path,
-            "model_name": model_name,
-            "max_len": max_len,
-            "train_batch_size": train_bs,
-            "val_batch_size": val_bs,
-            "epochs": epochs,
-            "learning_rate": lr,
-            "warmup_ratio": warmup_ratio,
-            "device": str(device),
-        },
+        project="research_longformer",
+        config=config_defaults,
     )
-
+    config = wandb.config 
+    train_bs = config.train_batch_size
+    val_bs = config.val_batch_size
+    epochs = config.epochs
+    lr = config.learning_rate
+    warmup_ratio = config.warmup_ratio
+    weight_decay = config.weight_decay
     best_val_acc = -1.0
     best_ckpt_path = "best_model.pt"
 
@@ -59,7 +62,7 @@ def main():
     test_loader = DataLoader(test_ds, batch_size=val_bs, shuffle=False)
 
     model = build_model(model_name, num_labels=3).to(device)
-    optim = torch.optim.AdamW(model.parameters(), lr=lr)
+    optim = torch.optim.AdamW(model.parameters(), lr=lr,weight_decay=weight_decay,)
     num_training_steps = epochs * len(train_loader)
     num_warmup_steps = int(warmup_ratio * num_training_steps)
     scheduler = get_linear_schedule_with_warmup(
