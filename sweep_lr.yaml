@@ -29,3 +29,6 @@ parameters:
 
   val_batch_size:
     values: [2]
+  
+  fusion_mode:
+    values: ["concat", "sum"]
