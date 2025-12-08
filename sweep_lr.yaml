@@ -1,5 +1,6 @@
-program: src/train.py
+program: train.py
 method: bayes 
+run_cap: 15
 
 metric:
   name: val_acc
