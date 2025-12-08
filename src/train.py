@@ -5,16 +5,44 @@ import numpy as np
 from torch.utils.data import DataLoader
 from sklearn.model_selection import train_test_split
 from transformers import LongformerTokenizerFast, get_linear_schedule_with_warmup
+
 from src.data_utils import AnswersDataset
 from src.model_utils import build_model
 
 import wandb
 
+
+def forward_batch(model, batch, fusion_mode):
+    """
+    Helper to call model correctly for concat vs sum modes.
+    """
+    if fusion_mode == "concat":
+        return model(
+            input_ids=batch["input_ids"],
+            attention_mask=batch["attention_mask"],
+            labels=batch["labels"],
+            global_attention_mask=batch.get("global_attention_mask", None),
+        )
+    else:  # "sum"
+        return model(
+            q_input_ids=batch["q_input_ids"],
+            s_input_ids=batch["s_input_ids"],
+            m_input_ids=batch["m_input_ids"],
+            q_attention_mask=batch["q_attention_mask"],
+            s_attention_mask=batch["s_attention_mask"],
+            m_attention_mask=batch["m_attention_mask"],
+            labels=batch["labels"],
+            global_attention_mask=batch.get("global_attention_mask", None),
+        )
+
+
 def main():
     csv_path = "data/classifies_edited.csv"
     model_name = "allenai/longformer-base-4096"
     max_len = 512
+
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
     config_defaults = {
         "csv_path": csv_path,
         "model_name": model_name,
@@ -24,7 +52,8 @@ def main():
         "epochs": 3,
         "learning_rate": 2e-5,
         "warmup_ratio": 0.1,
-        "weight_decay": 0.01,   # NEW: we'll sweep this too if we want
+        "weight_decay": 0.01,
+        "fusion_mode": "concat",  # "concat" or "sum"
         "device": str(device),
     }
 
@@ -32,16 +61,22 @@ def main():
         project="research_longformer",
         config=config_defaults,
     )
-    config = wandb.config 
+    config = wandb.config
+
     train_bs = config.train_batch_size
     val_bs = config.val_batch_size
     epochs = config.epochs
     lr = config.learning_rate
     warmup_ratio = config.warmup_ratio
     weight_decay = config.weight_decay
+    fusion_mode = config.fusion_mode  # <--- use this
+
+    assert fusion_mode in ("concat", "sum"), "fusion_mode must be 'concat' or 'sum'"
+
     best_val_acc = -1.0
     best_ckpt_path = "best_model.pt"
 
+    # ===== Load data =====
     df = pd.read_csv(csv_path).dropna(subset=["student_answer", "label"]).copy()
     df["label"] = df["label"].astype(int)
 
@@ -52,17 +87,26 @@ def main():
         temp_df, test_size=0.50, stratify=temp_df["label"], random_state=42
     )
 
+    # ===== Tokenizer & Datasets =====
     tok = LongformerTokenizerFast.from_pretrained(model_name)
-    train_ds = AnswersDataset(train_df, tok, max_len=max_len)
-    val_ds = AnswersDataset(val_df, tok, max_len=max_len)
-    test_ds = AnswersDataset(test_df, tok, max_len=max_len)
+
+    train_ds = AnswersDataset(train_df, tok, max_len=max_len, fusion_mode=fusion_mode)
+    val_ds = AnswersDataset(val_df, tok, max_len=max_len, fusion_mode=fusion_mode)
+    test_ds = AnswersDataset(test_df, tok, max_len=max_len, fusion_mode=fusion_mode)
 
     train_loader = DataLoader(train_ds, batch_size=train_bs, shuffle=True)
     val_loader = DataLoader(val_ds, batch_size=val_bs, shuffle=False)
     test_loader = DataLoader(test_ds, batch_size=val_bs, shuffle=False)
 
-    model = build_model(model_name, num_labels=3).to(device)
-    optim = torch.optim.AdamW(model.parameters(), lr=lr,weight_decay=weight_decay,)
+    # ===== Model, Optimizer, Scheduler =====
+    model = build_model(model_name, num_labels=3, fusion_mode=fusion_mode).to(device)
+
+    optim = torch.optim.AdamW(
+        model.parameters(),
+        lr=lr,
+        weight_decay=weight_decay,
+    )
+
     num_training_steps = epochs * len(train_loader)
     num_warmup_steps = int(warmup_ratio * num_training_steps)
     scheduler = get_linear_schedule_with_warmup(
@@ -73,6 +117,7 @@ def main():
 
     wandb.watch(model, log="all", log_freq=100)
 
+    # ===== TRAINING LOOP =====
     for epoch in range(1, epochs + 1):
         model.train()
         running_train_loss = 0.0
@@ -80,18 +125,16 @@ def main():
 
         for batch in train_loader:
             batch = {k: v.to(device) for k, v in batch.items()}
-            out = model(
-                input_ids=batch["input_ids"],
-                attention_mask=batch["attention_mask"],
-                labels=batch["labels"],
-                global_attention_mask=batch.get("global_attention_mask", None),
-            )
+
+            out = forward_batch(model, batch, fusion_mode)
             loss = out["loss"]
+
             optim.zero_grad(set_to_none=True)
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
             optim.step()
             scheduler.step()
+
             wandb.log(
                 {
                     "train_batch_loss": loss.item(),
@@ -105,23 +148,19 @@ def main():
         avg_train_loss = running_train_loss / max(num_train_batches, 1)
         wandb.log({"epoch": epoch, "train_loss": avg_train_loss})
 
-        # ===== VALIDATION LOOP (FIXED) =====
+        # ===== VALIDATION LOOP =====
         model.eval()
-        total = correct = 0
-        val_loss_total = 0.0      # accumulate validation loss
+        total = 0
+        correct = 0
+        val_loss_total = 0.0
         num_val_batches = 0
 
         with torch.inference_mode():
             for batch in val_loader:
                 batch = {k: v.to(device) for k, v in batch.items()}
-                out = model(
-                    input_ids=batch["input_ids"],
-                    attention_mask=batch["attention_mask"],
-                    labels=batch["labels"],
-                    global_attention_mask=batch.get("global_attention_mask", None),
-                )
 
-                # NEW: accumulate loss and batch count
+                out = forward_batch(model, batch, fusion_mode)
+
                 val_loss_total += out["loss"].item()
                 num_val_batches += 1
 
@@ -129,9 +168,8 @@ def main():
                 correct += (preds == batch["labels"]).sum().item()
                 total += batch["labels"].size(0)
 
-        # NEW: compute average val_loss
         val_loss = val_loss_total / max(num_val_batches, 1)
-        val_acc = correct / total if total else 0.0  # keep only one line
+        val_acc = correct / total if total else 0.0
 
         wandb.log(
             {
@@ -150,30 +188,33 @@ def main():
             best_val_acc = val_acc
             torch.save(model.state_dict(), best_ckpt_path)
 
+    # ===== TEST PHASE =====
     model.load_state_dict(torch.load(best_ckpt_path, map_location=device))
     model.eval()
 
-    total = correct = 0
+    total = 0
+    correct = 0
     all_preds, all_labels = [], []
+
     with torch.inference_mode():
         for batch in test_loader:
             batch = {k: v.to(device) for k, v in batch.items()}
-            out = model(
-                input_ids=batch["input_ids"],
-                attention_mask=batch["attention_mask"],
-                labels=batch["labels"],
-                global_attention_mask=batch.get("global_attention_mask", None),
-            )
+
+            out = forward_batch(model, batch, fusion_mode)
+
             preds = out["logits"].argmax(dim=-1)
             correct += (preds == batch["labels"]).sum().item()
             total += batch["labels"].size(0)
+
             all_preds.append(preds.cpu())
             all_labels.append(batch["labels"].cpu())
 
     test_acc = correct / total if total else 0.0
     print(f"\nFinal TEST accuracy: {test_acc:.4f}")
+
     all_preds = torch.cat(all_preds).numpy()
     all_labels = torch.cat(all_labels).numpy()
+
     if all_preds.std() == 0 or all_labels.std() == 0:
         print("Correlation between predictions and labels: undefined")
         corr = None
@@ -188,5 +229,7 @@ def main():
         }
     )
 
+
 if __name__ == "__main__":
     main()
+
