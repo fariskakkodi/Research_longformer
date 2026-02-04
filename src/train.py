@@ -1,39 +1,13 @@
-import os
 import torch
 import pandas as pd
 import numpy as np
 from torch.utils.data import DataLoader
-from sklearn.model_selection import train_test_split
 from transformers import LongformerTokenizerFast, get_linear_schedule_with_warmup
 
 from src.data_utils import AnswersDataset
 from src.model_utils import build_model
 
 import wandb
-
-
-def forward_batch(model, batch, fusion_mode):
-    """
-    Helper to call model correctly for concat vs sum modes.
-    """
-    if fusion_mode == "concat":
-        return model(
-            input_ids=batch["input_ids"],
-            attention_mask=batch["attention_mask"],
-            labels=batch["labels"],
-            global_attention_mask=batch.get("global_attention_mask", None),
-        )
-    else:  # "sum"
-        return model(
-            q_input_ids=batch["q_input_ids"],
-            s_input_ids=batch["s_input_ids"],
-            m_input_ids=batch["m_input_ids"],
-            q_attention_mask=batch["q_attention_mask"],
-            s_attention_mask=batch["s_attention_mask"],
-            m_attention_mask=batch["m_attention_mask"],
-            labels=batch["labels"],
-            global_attention_mask=batch.get("global_attention_mask", None),
-        )
 
 
 def main():
@@ -47,8 +21,8 @@ def main():
 
     config_defaults = {
         "train_path": train_path,
-        "val_path":val_path,
-        "test_path":test_path,
+        "val_path": val_path,
+        "test_path": test_path,
         "model_name": model_name,
         "max_len": max_len,
         "train_batch_size": 2,
@@ -57,14 +31,11 @@ def main():
         "learning_rate": 2e-5,
         "warmup_ratio": 0.1,
         "weight_decay": 0.01,
-        "fusion_mode": "concat",  # "concat" or "sum"
+        "fusion_mode": "concat",
         "device": str(device),
     }
 
-    wandb.init(
-        project="research_longformer",
-        config=config_defaults,
-    )
+    wandb.init(project="research_longformer", config=config_defaults)
     config = wandb.config
 
     train_bs = config.train_batch_size
@@ -73,43 +44,39 @@ def main():
     lr = config.learning_rate
     warmup_ratio = config.warmup_ratio
     weight_decay = config.weight_decay
-    fusion_mode = config.fusion_mode  # <--- use this
-
-    assert fusion_mode in ("concat", "sum"), "fusion_mode must be 'concat' or 'sum'"
 
     best_val_acc = -1.0
     best_ckpt_path = "best_model.pt"
 
-    # ===== Load data =====
-    df = pd.read_csv(csv_path).dropna(subset=["student_answer", "label"]).copy()
-    df["label"] = df["label"].astype(int)
+    train_df = pd.read_csv(train_path).dropna(subset=["ResponseText.x", "ground_truth"]).copy()
+    val_df = pd.read_csv(val_path).dropna(subset=["ResponseText.x", "ground_truth"]).copy()
+    test_df = pd.read_csv(test_path).dropna(subset=["ResponseText.x", "ground_truth"]).copy()
 
-    train_df, temp_df = train_test_split(
-        df, test_size=0.30, stratify=df["label"], random_state=42
-    )
-    val_df, test_df = train_test_split(
-        temp_df, test_size=0.50, stratify=temp_df["label"], random_state=42
-    )
+    train_df["ground_truth"] = train_df["ground_truth"].astype(int)
+    val_df["ground_truth"] = val_df["ground_truth"].astype(int)
+    test_df["ground_truth"] = test_df["ground_truth"].astype(int)
 
-    # ===== Tokenizer & Datasets =====
+    min_label = int(train_df["ground_truth"].min())
+    if min_label != 0:
+        train_df["ground_truth"] -= min_label
+        val_df["ground_truth"] -= min_label
+        test_df["ground_truth"] -= min_label
+
+    num_labels = int(train_df["ground_truth"].nunique())
+
     tok = LongformerTokenizerFast.from_pretrained(model_name)
 
-    train_ds = AnswersDataset(train_df, tok, max_len=max_len, fusion_mode=fusion_mode)
-    val_ds = AnswersDataset(val_df, tok, max_len=max_len, fusion_mode=fusion_mode)
-    test_ds = AnswersDataset(test_df, tok, max_len=max_len, fusion_mode=fusion_mode)
+    train_ds = AnswersDataset(train_df, tok, max_len=max_len)
+    val_ds = AnswersDataset(val_df, tok, max_len=max_len)
+    test_ds = AnswersDataset(test_df, tok, max_len=max_len)
 
     train_loader = DataLoader(train_ds, batch_size=train_bs, shuffle=True)
     val_loader = DataLoader(val_ds, batch_size=val_bs, shuffle=False)
     test_loader = DataLoader(test_ds, batch_size=val_bs, shuffle=False)
 
-    # ===== Model, Optimizer, Scheduler =====
-    model = build_model(model_name, num_labels=3, fusion_mode=fusion_mode).to(device)
+    model = build_model(model_name, num_labels=num_labels, fusion_mode="concat").to(device)
 
-    optim = torch.optim.AdamW(
-        model.parameters(),
-        lr=lr,
-        weight_decay=weight_decay,
-    )
+    optim = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
 
     num_training_steps = epochs * len(train_loader)
     num_warmup_steps = int(warmup_ratio * num_training_steps)
@@ -121,7 +88,6 @@ def main():
 
     wandb.watch(model, log="all", log_freq=100)
 
-    # ===== TRAINING LOOP =====
     for epoch in range(1, epochs + 1):
         model.train()
         running_train_loss = 0.0
@@ -130,7 +96,12 @@ def main():
         for batch in train_loader:
             batch = {k: v.to(device) for k, v in batch.items()}
 
-            out = forward_batch(model, batch, fusion_mode)
+            out = model(
+                input_ids=batch["input_ids"],
+                attention_mask=batch["attention_mask"],
+                labels=batch["labels"],
+                global_attention_mask=batch.get("global_attention_mask", None),
+            )
             loss = out["loss"]
 
             optim.zero_grad(set_to_none=True)
@@ -139,12 +110,7 @@ def main():
             optim.step()
             scheduler.step()
 
-            wandb.log(
-                {
-                    "train_batch_loss": loss.item(),
-                    "learning_rate": optim.param_groups[0]["lr"],
-                }
-            )
+            wandb.log({"train_batch_loss": loss.item(), "learning_rate": optim.param_groups[0]["lr"]})
 
             running_train_loss += loss.item()
             num_train_batches += 1
@@ -152,7 +118,6 @@ def main():
         avg_train_loss = running_train_loss / max(num_train_batches, 1)
         wandb.log({"epoch": epoch, "train_loss": avg_train_loss})
 
-        # ===== VALIDATION LOOP =====
         model.eval()
         total = 0
         correct = 0
@@ -163,7 +128,12 @@ def main():
             for batch in val_loader:
                 batch = {k: v.to(device) for k, v in batch.items()}
 
-                out = forward_batch(model, batch, fusion_mode)
+                out = model(
+                    input_ids=batch["input_ids"],
+                    attention_mask=batch["attention_mask"],
+                    labels=batch["labels"],
+                    global_attention_mask=batch.get("global_attention_mask", None),
+                )
 
                 val_loss_total += out["loss"].item()
                 num_val_batches += 1
@@ -175,24 +145,14 @@ def main():
         val_loss = val_loss_total / max(num_val_batches, 1)
         val_acc = correct / total if total else 0.0
 
-        wandb.log(
-            {
-                "epoch": epoch,
-                "val_loss": val_loss,
-                "val_acc": val_acc,
-            }
-        )
+        wandb.log({"epoch": epoch, "val_loss": val_loss, "val_acc": val_acc})
 
-        print(
-            f"epoch {epoch}  train_loss={avg_train_loss:.4f}  "
-            f"val_loss={val_loss:.4f}  val_acc={val_acc:.4f}"
-        )
+        print(f"epoch {epoch}  train_loss={avg_train_loss:.4f}  val_loss={val_loss:.4f}  val_acc={val_acc:.4f}")
 
         if val_acc > best_val_acc:
             best_val_acc = val_acc
             torch.save(model.state_dict(), best_ckpt_path)
 
-    # ===== TEST PHASE =====
     model.load_state_dict(torch.load(best_ckpt_path, map_location=device))
     model.eval()
 
@@ -204,7 +164,12 @@ def main():
         for batch in test_loader:
             batch = {k: v.to(device) for k, v in batch.items()}
 
-            out = forward_batch(model, batch, fusion_mode)
+            out = model(
+                input_ids=batch["input_ids"],
+                attention_mask=batch["attention_mask"],
+                labels=batch["labels"],
+                global_attention_mask=batch.get("global_attention_mask", None),
+            )
 
             preds = out["logits"].argmax(dim=-1)
             correct += (preds == batch["labels"]).sum().item()
@@ -219,19 +184,14 @@ def main():
     all_preds = torch.cat(all_preds).numpy()
     all_labels = torch.cat(all_labels).numpy()
 
-    if all_preds.std() == 0 or all_labels.std() == 0:
-        print("Correlation between predictions and labels: undefined")
-        corr = None
-    else:
+    corr = None
+    if all_preds.std() != 0 and all_labels.std() != 0:
         corr = np.corrcoef(all_preds, all_labels)[0, 1]
         print(f"Correlation between predictions and labels: {corr:.4f}")
+    else:
+        print("Correlation between predictions and labels: undefined")
 
-    wandb.log(
-        {
-            "test_acc": test_acc,
-            "test_corr": float(corr) if corr is not None else None,
-        }
-    )
+    wandb.log({"test_acc": test_acc, "test_corr": float(corr) if corr is not None else None})
 
 
 if __name__ == "__main__":
