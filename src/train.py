@@ -37,14 +37,18 @@ def forward_batch(model, batch, fusion_mode):
 
 
 def main():
-    csv_path = "data/classifies_edited.csv"
+    train_path = "data/new_training.csv"
+    val_path = "data/new_validation (1).csv"
+    test_path = "data/new_test (2).csv"
     model_name = "allenai/longformer-base-4096"
     max_len = 512
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     config_defaults = {
-        "csv_path": csv_path,
+        "train_path": train_path,
+        "val_path":val_path,
+        "test_path":test_path,
         "model_name": model_name,
         "max_len": max_len,
         "train_batch_size": 2,
