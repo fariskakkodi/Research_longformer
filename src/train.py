@@ -64,11 +64,51 @@ def main():
 
     num_labels = int(train_df["ground_truth"].nunique())
 
+    train_df["question"] = ""
+    train_df["model_answer"] = ""
+    val_df["question"] = ""
+    val_df["model_answer"] = ""
+    test_df["question"] = ""
+    test_df["model_answer"] = ""
+
     tok = LongformerTokenizerFast.from_pretrained(model_name)
 
-    train_ds = AnswersDataset(train_df, tok, max_len=max_len)
-    val_ds = AnswersDataset(val_df, tok, max_len=max_len)
-    test_ds = AnswersDataset(test_df, tok, max_len=max_len)
+    #train_ds = AnswersDataset(train_df, tok, max_len=max_len)
+    #val_ds = AnswersDataset(val_df, tok, max_len=max_len)
+    #test_ds = AnswersDataset(test_df, tok, max_len=max_len)
+
+    train_ds = AnswersDataset(
+        train_df, 
+        tok, 
+        text_col="ResponseText.x",
+        model_col="model_answer",
+        question_col="question",
+        label_col="ground_truth",
+        max_len=max_len,
+        fusion_mode="concat"
+    )
+
+    val_ds = AnswersDataset(
+        val_df, 
+        tok, 
+        text_col="ResponseText.x",
+        model_col="model_answer",
+        question_col="question",
+        label_col="ground_truth",
+        max_len=max_len,
+        fusion_mode="concat"
+    )
+
+    test_ds = AnswersDataset(
+        test_df, 
+        tok, 
+        text_col="ResponseText.x",
+        model_col="model_answer",
+        question_col="question",
+        label_col="ground_truth",
+        max_len=max_len,
+        fusion_mode="concat"
+    )
 
     train_loader = DataLoader(train_ds, batch_size=train_bs, shuffle=True)
     val_loader = DataLoader(val_ds, batch_size=val_bs, shuffle=False)
