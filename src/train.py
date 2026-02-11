@@ -27,7 +27,7 @@ def main():
         "max_len": max_len,
         "train_batch_size": 2,
         "val_batch_size": 2,
-        "epochs": 3,
+        "epochs": 5,
         "learning_rate": 2e-5,
         "warmup_ratio": 0.1,
         "weight_decay": 0.01,
