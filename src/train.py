@@ -200,10 +200,12 @@ def main():
 
     total = 0
     correct = 0
-    all_preds, all_labels = [], []
+    rows_for_csv = []
 
     with torch.inference_mode():
         for batch in test_loader:
+            batch_idx = batch["idx"].cpu().numpy()
+
             batch = {k: v.to(device) for k, v in batch.items()}
 
             out = model(
@@ -213,27 +215,35 @@ def main():
                 global_attention_mask=batch.get("global_attention_mask", None),
             )
 
-            preds = out["logits"].argmax(dim=-1)
+            logits = out["logits"]
+            probs = F.softmax(logits, dim=-1)
+            conf, preds = probs.max(dim=-1)
+
             correct += (preds == batch["labels"]).sum().item()
             total += batch["labels"].size(0)
 
-            all_preds.append(preds.cpu())
-            all_labels.append(batch["labels"].cpu())
+            preds_np = preds.cpu().numpy()
+            labels_np = batch["labels"].cpu().numpy()
+            conf_np = conf.cpu().numpy()
+
+            for i, idx in enumerate(batch_idx):
+                rows_for_csv.append({
+                    "UNIV": test_df.iloc[idx]["UNIV"],
+                    "true_label": int(labels_np[i]),
+                    "pred_label": int(preds_np[i]),
+                    "confidence": float(conf_np[i]),
+                })
 
     test_acc = correct / total if total else 0.0
     print(f"\nFinal TEST accuracy: {test_acc:.4f}")
 
-    all_preds = torch.cat(all_preds).numpy()
-    all_labels = torch.cat(all_labels).numpy()
+    preds_out_path = "test_predictions.csv"
+    pd.DataFrame(rows_for_csv).to_csv(preds_out_path, index=False)
+    print("Saved predictions to:", os.path.abspath(preds_out_path))
 
-    corr = None
-    if all_preds.std() != 0 and all_labels.std() != 0:
-        corr = np.corrcoef(all_preds, all_labels)[0, 1]
-        print(f"Correlation between predictions and labels: {corr:.4f}")
-    else:
-        print("Correlation between predictions and labels: undefined")
+    wandb.log({"test_acc": test_acc})
+    wandb.save(preds_out_path)
 
-    wandb.log({"test_acc": test_acc, "test_corr": float(corr) if corr is not None else None})
 
 
 if __name__ == "__main__":
