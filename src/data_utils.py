@@ -62,6 +62,7 @@ class AnswersDataset(Dataset):
             )
             item = {k: v.squeeze(0) for k, v in enc.items()}
             item["labels"] = torch.tensor(label, dtype=torch.long)
+            item["idx"] = torch.tensor(idx, dtype=torch.long)
             return item
 
         else:
@@ -96,6 +97,7 @@ class AnswersDataset(Dataset):
                 "m_input_ids": enc_m["input_ids"].squeeze(0),
                 "m_attention_mask": enc_m["attention_mask"].squeeze(0),
                 "labels": torch.tensor(label, dtype=torch.long),
+                "idx": torch.tensor(idx, dtype=torch.long),
             }
             return item
 
