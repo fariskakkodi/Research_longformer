@@ -13,9 +13,9 @@ import torch.nn.functional as F
 import os
 
 def main():
-    train_path = "data/new_training.csv"
-    val_path = "data/new_validation (1).csv"
-    test_path = "data/new_test (2).csv"
+    train_path = "data/train_updated_1.csv"
+    val_path = "data/val_updated_1.csv"
+    test_path = "data/test_updated_1.csv"
     model_name = "allenai/longformer-base-4096"
     max_len = 512
 
