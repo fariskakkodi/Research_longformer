@@ -13,9 +13,9 @@ import torch.nn.functional as F
 import os
 
 def main():
-    train_path = "data/train_updated_1.csv"
-    val_path = "data/val_updated_1.csv"
-    test_path = "data/test_updated_1.csv"
+    train_path = "data/train_new_data.csv"
+    val_path = "data/val_new_data.csv"
+    test_path = "data/test_new_data.csv"
     model_name = "allenai/longformer-base-4096"
     max_len = 4096
 
@@ -66,12 +66,6 @@ def main():
 
     num_labels = int(train_df["ground_truth"].nunique())
 
-    train_df["question"] = ""
-    train_df["model_answer"] = ""
-    val_df["question"] = ""
-    val_df["model_answer"] = ""
-    test_df["question"] = ""
-    test_df["model_answer"] = ""
 
     tok = LongformerTokenizerFast.from_pretrained(model_name)
 
@@ -83,8 +77,9 @@ def main():
         train_df, 
         tok, 
         text_col="ResponseText.x",
-        model_col="model_answer",
-        question_col="question",
+        model_col="Model_Answer",
+        question_col="Question",
+        rubric_col="Rubric",
         label_col="ground_truth",
         max_len=max_len,
         fusion_mode="concat"
@@ -94,8 +89,9 @@ def main():
         val_df, 
         tok, 
         text_col="ResponseText.x",
-        model_col="model_answer",
-        question_col="question",
+        model_col="Model_Answer",
+        question_col="Question",
+        rubric_col="Rubric",
         label_col="ground_truth",
         max_len=max_len,
         fusion_mode="concat"
@@ -105,8 +101,9 @@ def main():
         test_df, 
         tok, 
         text_col="ResponseText.x",
-        model_col="model_answer",
-        question_col="question",
+        model_col="Model_Answer",
+        question_col="Question",
+        rubric_col="Rubric",
         label_col="ground_truth",
         max_len=max_len,
         fusion_mode="concat"
