@@ -44,12 +44,14 @@ class AnswersDataset(Dataset):
         model_text = self.modelanswer[idx]
         question_text = self.question[idx]
         label = self.labels[idx]
+        rubric_text = self.rubric[idx]
 
         if self.fusion_mode == "concat":
             # ===== ORIGINAL CONCAT BEHAVIOR =====
             sep = self.tokenizer.sep_token
             combined = (
                 f"Question: {question_text} {sep} "
+                f"Rubric: {rubric_text} {sep} "
                 f"Student answer: {student_text} {sep} "
                 f"Model answer: {model_text}"
             )
