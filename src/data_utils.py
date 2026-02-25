@@ -20,6 +20,7 @@ class AnswersDataset(Dataset):
         text_col: str = "student_answer",
         model_col: str = "model_answer",
         question_col: str = "question",
+        rubric_col: str = "rubric",
         label_col: str = "label",
         max_len: int = 2048,
         fusion_mode: str = "concat",  # "concat" or "sum"
