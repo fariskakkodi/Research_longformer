@@ -17,7 +17,7 @@ def main():
     val_path = "data/val_updated_1.csv"
     test_path = "data/test_updated_1.csv"
     model_name = "allenai/longformer-base-4096"
-    max_len = 512
+    max_len = 4096
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
