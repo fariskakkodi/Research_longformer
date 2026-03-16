@@ -19,7 +19,7 @@ class AnswersDataset(Dataset):
         tokenizer,
         text_col: str = "student_answer",
         model_col: str = "model_answer",
-        #question_col: str = "question",
+        question_col: str = "question",
         #rubric_col: str = "rubric",
         label_col: str = "label",
         max_len: int = 2048,
@@ -29,7 +29,7 @@ class AnswersDataset(Dataset):
 
         self.texts = df[text_col].astype(str).fillna("").tolist()
         self.modelanswer = df[model_col].astype(str).fillna("").tolist()
-        #self.question = df[question_col].astype(str).fillna("").tolist()
+        self.question = df[question_col].astype(str).fillna("").tolist()
         #self.rubric = df[rubric_col].astype(str).fillna("").tolist()
         self.labels = df[label_col].astype(int).tolist()
 
@@ -43,7 +43,7 @@ class AnswersDataset(Dataset):
     def __getitem__(self, idx):
         student_text = self.texts[idx]
         model_text = self.modelanswer[idx]
-        #question_text = self.question[idx]
+        question_text = self.question[idx]
         label = self.labels[idx]
         #rubric_text = self.rubric[idx]
 
@@ -51,7 +51,7 @@ class AnswersDataset(Dataset):
             # ===== ORIGINAL CONCAT BEHAVIOR =====
             sep = self.tokenizer.sep_token
             combined = (
-                #f"Question: {question_text} {sep} "
+                f"Question: {question_text} {sep} "
                 #f"Rubric: {rubric_text} {sep} "
                 f"Student answer: {student_text} {sep} "
                 f"Model answer: {model_text}"
