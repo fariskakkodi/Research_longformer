@@ -52,9 +52,9 @@ class AnswersDataset(Dataset):
             sep = self.tokenizer.sep_token
             combined = (
                 f"Question: {question_text} {sep} "
-                #f"Rubric: {rubric_text} {sep} "
                 f"Student answer: {student_text} {sep} "
                 f"Model answer: {model_text}"
+                #f"Rubric: {rubric_text} {sep} "
             )
 
             enc = self.tokenizer(
