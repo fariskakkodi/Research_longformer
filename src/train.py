@@ -15,9 +15,9 @@ from datetime import datetime
 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
 def main():
-    train_path = "data/train_new_data.csv"
-    val_path = "data/validation_new_data.csv"
-    test_path = "data/test_new_data.csv"
+    train_path = "data/train_new_data_final.csv"
+    val_path = "data/validation_new_data_final.csv"
+    test_path = "data/test_new_data_final.csv"
     model_name = "allenai/longformer-base-4096"
     max_len = 4096
 
