@@ -81,7 +81,7 @@ def main():
         text_col="ResponseText.x",
         model_col="Model_Answer",
         question_col="Question",
-        rubric_col="Rubric",
+        #rubric_col="Rubric",
         label_col="ground_truth",
         max_len=max_len,
         fusion_mode="concat"
@@ -93,7 +93,7 @@ def main():
         text_col="ResponseText.x",
         model_col="Model_Answer",
         question_col="Question",
-        rubric_col="Rubric",
+        #rubric_col="Rubric",
         label_col="ground_truth",
         max_len=max_len,
         fusion_mode="concat"
@@ -105,7 +105,7 @@ def main():
         text_col="ResponseText.x",
         model_col="Model_Answer",
         question_col="Question",
-        rubric_col="Rubric",
+        #rubric_col="Rubric",
         label_col="ground_truth",
         max_len=max_len,
         fusion_mode="concat"
