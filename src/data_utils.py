@@ -20,7 +20,7 @@ class AnswersDataset(Dataset):
         text_col: str = "student_answer",
         model_col: str = "model_answer",
         question_col: str = "question",
-        rubric_col: str = "rubric",
+        #rubric_col: str = "rubric",
         label_col: str = "label",
         max_len: int = 2048,
         fusion_mode: str = "concat",  # "concat" or "sum"
@@ -30,7 +30,7 @@ class AnswersDataset(Dataset):
         self.texts = df[text_col].astype(str).fillna("").tolist()
         self.modelanswer = df[model_col].astype(str).fillna("").tolist()
         self.question = df[question_col].astype(str).fillna("").tolist()
-        self.rubric = df[rubric_col].astype(str).fillna("").tolist()
+        #self.rubric = df[rubric_col].astype(str).fillna("").tolist()
         self.labels = df[label_col].astype(int).tolist()
 
         self.tokenizer = tokenizer
@@ -45,7 +45,7 @@ class AnswersDataset(Dataset):
         model_text = self.modelanswer[idx]
         question_text = self.question[idx]
         label = self.labels[idx]
-        rubric_text = self.rubric[idx]
+        #rubric_text = self.rubric[idx]
 
         if self.fusion_mode == "concat":
             # ===== ORIGINAL CONCAT BEHAVIOR =====
@@ -54,7 +54,7 @@ class AnswersDataset(Dataset):
                 f"Question: {question_text} {sep} "
                 f"Student answer: {student_text} {sep} "
                 f"Model answer: {model_text}"
-                f"Rubric: {rubric_text} {sep} "
+                #f"Rubric: {rubric_text} {sep} "
             )
 
             enc = self.tokenizer(
