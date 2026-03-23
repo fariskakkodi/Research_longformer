@@ -237,7 +237,7 @@ def main():
     test_acc = correct / total if total else 0.0
     print(f"\nFinal TEST accuracy: {test_acc:.4f}")
 
-    preds_out_path = f"test_predictions_q_m.csv"
+    preds_out_path = f"test_predictions_q_a_m_final.csv"
     pd.DataFrame(rows_for_csv).to_csv(preds_out_path, index=False)
     print("Saved predictions to:", os.path.abspath(preds_out_path))
 
