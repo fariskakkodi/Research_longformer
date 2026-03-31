@@ -227,10 +227,10 @@ def main():
 
             for i, idx in enumerate(batch_idx):
                 rows_for_csv.append({
-                    "UNIV": test_df.iloc[idx]["UNIV"],
+                    "university": test_df.iloc[idx]["UNIV"],
                     "Question_type": test_df.iloc[idx]["TaskPrompt"],
                     "true_label": int(labels_np[i]),
-                    "pred_label": int(preds_np[i]),
+                    "predicted_label": int(preds_np[i]),
                     "confidence": float(conf_np[i]),
                 })
 
