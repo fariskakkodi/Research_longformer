@@ -81,7 +81,7 @@ def main():
         text_col="ResponseText.x",
         model_col="Model_Answer",
         question_col="Question",
-        #rubric_col="Rubric",
+        rubric_col="Rubric",
         label_col="ground_truth",
         max_len=max_len,
         fusion_mode="concat"
@@ -93,7 +93,7 @@ def main():
         text_col="ResponseText.x",
         model_col="Model_Answer",
         question_col="Question",
-        #rubric_col="Rubric",
+        rubric_col="Rubric",
         label_col="ground_truth",
         max_len=max_len,
         fusion_mode="concat"
@@ -105,7 +105,7 @@ def main():
         text_col="ResponseText.x",
         model_col="Model_Answer",
         question_col="Question",
-        #rubric_col="Rubric",
+        rubric_col="Rubric",
         label_col="ground_truth",
         max_len=max_len,
         fusion_mode="concat"
@@ -227,6 +227,7 @@ def main():
 
             for i, idx in enumerate(batch_idx):
                 rows_for_csv.append({
+                    "response_id": test_df.iloc[idx]["ResponseId"],
                     "university": test_df.iloc[idx]["UNIV"],
                     "Question_type": test_df.iloc[idx]["TaskPrompt"],
                     "true_label": int(labels_np[i]),
@@ -237,7 +238,7 @@ def main():
     test_acc = correct / total if total else 0.0
     print(f"\nFinal TEST accuracy: {test_acc:.4f}")
 
-    preds_out_path = f"test_predictions_q_a_m_final.csv"
+    preds_out_path = f"longformer_output_q+a+m+r_final.csv"
     pd.DataFrame(rows_for_csv).to_csv(preds_out_path, index=False)
     print("Saved predictions to:", os.path.abspath(preds_out_path))
 
