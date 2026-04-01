@@ -29,7 +29,7 @@ class AnswersDataset(Dataset):
 
         self.texts = df[text_col].astype(str).fillna("").tolist()
         self.modelanswer = df[model_col].astype(str).fillna("").tolist()
-        self.question = df[question_col].astype(str).fillna("").tolist()
+        #self.question = df[question_col].astype(str).fillna("").tolist()
         #self.rubric = df[rubric_col].astype(str).fillna("").tolist()
         self.labels = df[label_col].astype(int).tolist()
 
