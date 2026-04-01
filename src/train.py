@@ -80,7 +80,7 @@ def main():
         tok, 
         text_col="ResponseText.x",
         model_col="Model_Answer",
-        question_col="Question",
+        #question_col="Question",
         #rubric_col="Rubric",
         label_col="ground_truth",
         max_len=max_len,
@@ -92,7 +92,7 @@ def main():
         tok, 
         text_col="ResponseText.x",
         model_col="Model_Answer",
-        question_col="Question",
+        #question_col="Question",
         #rubric_col="Rubric",
         label_col="ground_truth",
         max_len=max_len,
@@ -104,7 +104,7 @@ def main():
         tok, 
         text_col="ResponseText.x",
         model_col="Model_Answer",
-        question_col="Question",
+        #question_col="Question",
         #rubric_col="Rubric",
         label_col="ground_truth",
         max_len=max_len,
@@ -238,7 +238,7 @@ def main():
     test_acc = correct / total if total else 0.0
     print(f"\nFinal TEST accuracy: {test_acc:.4f}")
 
-    preds_out_path = f"longformer_output_q+a+m_final.csv"
+    preds_out_path = f"longformer_output_a+m_final.csv"
     pd.DataFrame(rows_for_csv).to_csv(preds_out_path, index=False)
     print("Saved predictions to:", os.path.abspath(preds_out_path))
 
