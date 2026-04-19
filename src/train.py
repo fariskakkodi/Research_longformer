@@ -31,12 +31,14 @@ def main():
         "max_len": max_len,
         "train_batch_size": 2,
         "val_batch_size": 2,
-        "epochs": 3,
+        "epochs": 50,              # upper bound only — early stopping will usually stop sooner
         "learning_rate": 2e-5,
         "warmup_ratio": 0.1,
         "weight_decay": 0.01,
         "fusion_mode": "concat",
         "device": str(device),
+        "patience": 3,             # stop after N epochs with no val_loss improvement
+        "min_delta": 1e-4,         # minimum improvement in val_loss to reset patience
     }
 
     wandb.init(project="research_longformer", config=config_defaults)
@@ -48,8 +50,14 @@ def main():
     lr = config.learning_rate
     warmup_ratio = config.warmup_ratio
     weight_decay = config.weight_decay
+    patience = config.patience
+    min_delta = config.min_delta
 
-    best_val_acc = -1.0
+    # ----- Early stopping tracking -----
+    best_val_loss = float("inf")
+    best_val_acc_at_best = 0.0
+    best_epoch = 0
+    epochs_no_improve = 0
     best_ckpt_path = "best_model.pt"
 
     train_df = pd.read_csv(train_path).dropna(subset=["ResponseText.x", "ground_truth"]).copy()
@@ -71,41 +79,31 @@ def main():
 
     tok = LongformerTokenizerFast.from_pretrained(model_name)
 
-    #train_ds = AnswersDataset(train_df, tok, max_len=max_len)
-    #val_ds = AnswersDataset(val_df, tok, max_len=max_len)
-    #test_ds = AnswersDataset(test_df, tok, max_len=max_len)
-
     train_ds = AnswersDataset(
-        train_df, 
-        tok, 
+        train_df,
+        tok,
         text_col="ResponseText.x",
         model_col="Model_Answer",
-        #question_col="Question",
-        #rubric_col="Rubric",
         label_col="ground_truth",
         max_len=max_len,
         fusion_mode="concat"
     )
 
     val_ds = AnswersDataset(
-        val_df, 
-        tok, 
+        val_df,
+        tok,
         text_col="ResponseText.x",
         model_col="Model_Answer",
-        #question_col="Question",
-        #rubric_col="Rubric",
         label_col="ground_truth",
         max_len=max_len,
         fusion_mode="concat"
     )
 
     test_ds = AnswersDataset(
-        test_df, 
-        tok, 
+        test_df,
+        tok,
         text_col="ResponseText.x",
         model_col="Model_Answer",
-        #question_col="Question",
-        #rubric_col="Rubric",
         label_col="ground_truth",
         max_len=max_len,
         fusion_mode="concat"
@@ -159,6 +157,7 @@ def main():
         avg_train_loss = running_train_loss / max(num_train_batches, 1)
         wandb.log({"epoch": epoch, "train_loss": avg_train_loss})
 
+        # ----- Validation -----
         model.eval()
         total = 0
         correct = 0
@@ -190,10 +189,24 @@ def main():
 
         print(f"epoch {epoch}  train_loss={avg_train_loss:.4f}  val_loss={val_loss:.4f}  val_acc={val_acc:.4f}")
 
-        if val_acc > best_val_acc:
-            best_val_acc = val_acc
+        # ----- Early stopping check (based on val_loss) -----
+        if val_loss < best_val_loss - min_delta:
+            best_val_loss = val_loss
+            best_val_acc_at_best = val_acc
+            best_epoch = epoch
+            epochs_no_improve = 0
             torch.save(model.state_dict(), best_ckpt_path)
+            print(f"  \u2713 val_loss improved to {val_loss:.4f} \u2014 saved checkpoint")
+        else:
+            epochs_no_improve += 1
+            print(f"  \u2717 no improvement in val_loss ({epochs_no_improve}/{patience})")
+            if epochs_no_improve >= patience:
+                print(f"Early stopping triggered at epoch {epoch}. "
+                      f"Best epoch was {best_epoch} with val_loss={best_val_loss:.4f}, val_acc={best_val_acc_at_best:.4f}")
+                break
 
+    # ----- Load best checkpoint and run test -----
+    print(f"\nLoading best model from epoch {best_epoch} (val_loss={best_val_loss:.4f}) for testing...")
     model.load_state_dict(torch.load(best_ckpt_path, map_location=device))
     model.eval()
 
@@ -242,7 +255,7 @@ def main():
     pd.DataFrame(rows_for_csv).to_csv(preds_out_path, index=False)
     print("Saved predictions to:", os.path.abspath(preds_out_path))
 
-    wandb.log({"test_acc": test_acc})
+    wandb.log({"test_acc": test_acc, "best_epoch": best_epoch, "best_val_loss": best_val_loss})
     wandb.save(preds_out_path)
 
 
