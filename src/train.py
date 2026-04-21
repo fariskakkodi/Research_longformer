@@ -29,8 +29,8 @@ def main():
         "test_path": test_path,
         "model_name": model_name,
         "max_len": max_len,
-        "train_batch_size": 2,
-        "val_batch_size": 2,
+        "train_batch_size": 8,
+        "val_batch_size": 8,
         "epochs": 50,              # upper bound only — early stopping will usually stop sooner
         "learning_rate": 2e-5,
         "warmup_ratio": 0.1,
