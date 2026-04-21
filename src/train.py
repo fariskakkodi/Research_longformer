@@ -251,7 +251,7 @@ def main():
     test_acc = correct / total if total else 0.0
     print(f"\nFinal TEST accuracy: {test_acc:.4f}")
 
-    preds_out_path = f"longformer_output_a+m_final.csv"
+    preds_out_path = f"higher_bs_longformer_output_a+m_final.csv"
     pd.DataFrame(rows_for_csv).to_csv(preds_out_path, index=False)
     print("Saved predictions to:", os.path.abspath(preds_out_path))
 
