@@ -113,7 +113,11 @@ def main():
     val_loader = DataLoader(val_ds, batch_size=val_bs, shuffle=False)
     test_loader = DataLoader(test_ds, batch_size=val_bs, shuffle=False)
 
-    model = build_model(model_name, num_labels=num_labels, fusion_mode="concat").to(device)
+    #model = build_model(model_name, num_labels=num_labels, fusion_mode="concat").to(device)
+    model = build_model(model_name, num_labels=num_labels, fusion_mode="concat")
+    if torch.cuda.device_count() > 1:
+        model = torch.nn.DataParallel(model)
+    model = model.to(device)
 
     optim = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
 
@@ -195,7 +199,8 @@ def main():
             best_val_acc_at_best = val_acc
             best_epoch = epoch
             epochs_no_improve = 0
-            torch.save(model.state_dict(), best_ckpt_path)
+            #torch.save(model.state_dict(), best_ckpt_path)
+            torch.save(model.module.state_dict() if isinstance(model, torch.nn.DataParallel) else model.state_dict(), best_ckpt_path)
             print(f"  \u2713 val_loss improved to {val_loss:.4f} \u2014 saved checkpoint")
         else:
             epochs_no_improve += 1
@@ -207,7 +212,9 @@ def main():
 
     # ----- Load best checkpoint and run test -----
     print(f"\nLoading best model from epoch {best_epoch} (val_loss={best_val_loss:.4f}) for testing...")
-    model.load_state_dict(torch.load(best_ckpt_path, map_location=device))
+    #model.load_state_dict(torch.load(best_ckpt_path, map_location=device))
+    state_dict = torch.load(best_ckpt_path, map_location=device)
+    model.module.load_state_dict(state_dict) if isinstance(model, torch.nn.DataParallel) else model.load_state_dict(state_dict)
     model.eval()
 
     total = 0
